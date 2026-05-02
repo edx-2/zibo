@@ -1,12 +1,13 @@
 import { ACTIONS } from '../engine/input.js';
 import { moveAndCollide } from '../engine/physics.js';
 
-// Movement constants from SPEC §4.3. Jump velocity bumped from -520 to -600
+// Movement constants from SPEC §4.3. Jump velocity bumped from -520 to -640
 // so Zibo can clear the "max 2 tiles up between platforms" gap the spec
-// specifies in Level 1 — at -520 the bottom-of-body peak only reaches y=480,
-// which doesn't clear a tile-y=7 platform (top y=448).
+// specifies — at -520 the bottom-of-body peak only reaches y=480, leaving
+// no clearance over a tile-y=7 platform (top y=448). At -640 there's ~18 px
+// of forgiveness, which matters for kids.
 const WALK_SPEED = 220;
-const JUMP_VELOCITY = -600;
+const JUMP_VELOCITY = -640;
 const VARIABLE_CUTOFF_MS = 400;
 const VARIABLE_CUTOFF_FACTOR = 0.4;
 const GRAVITY = 1400;

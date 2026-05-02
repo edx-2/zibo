@@ -14,29 +14,26 @@ export const LEVELS = [
     id: 1, name: 'Grassland', theme: 'grassland', width: 40, music: 'grassland', bg: 'grassland',
     spawn: { x: 2, y: 7 },
     goal: { x: 38, y: 7 },
-    rocketPart: { x: 37, y: 3, kind: 'engine' },
+    rocketPart: { x: 36, y: 6, kind: 'engine' },
     tiles: [
       ground(0, 14),
       ground(15, 4),
       block(15, 8, 1, 1),
       ground(20, 6),
-      block(20, 7, 1, 2),
-      block(23, 6, 2, 1),
+      block(23, 8, 2, 1),
       ground(28, 12),
-      block(30, 7, 2, 1),
-      block(34, 6, 3, 1),
-      block(36, 4, 3, 2)
+      block(30, 8, 2, 1),
+      block(34, 7, 4, 1)
     ],
     mushrooms: [
       { x: 16, y: 8 },
-      { x: 26, y: 8 },
-      { x: 33, y: 8 }
+      { x: 26, y: 8 }
     ],
     stars: [
-      star(4, 7), star(8, 7), star(12, 5),
-      star(17, 6), star(22, 5), star(24, 4),
-      star(29, 7), star(31, 5), star(35, 4),
-      star(38, 4)
+      star(4, 7), star(8, 7), star(12, 7),
+      star(17, 6), star(22, 7), star(24, 7),
+      star(29, 7), star(31, 7), star(35, 6),
+      star(36, 5)
     ]
   },
 
