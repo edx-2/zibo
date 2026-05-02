@@ -34,7 +34,10 @@ export class PoweredUpController {
     if (!this.isAvailable()) throw new Error('Web Bluetooth not available');
     this.setStatus('connecting');
     const device = await navigator.bluetooth.requestDevice({
-      filters: [{ services: [SERVICE_UUID] }]
+      filters: [{ services: [SERVICE_UUID] }],
+      // Some hubs advertise a battery service; allow it so we don't trigger an
+      // implicit GATT cleanup post-discovery.
+      optionalServices: ['battery_service', 'device_information']
     });
     this.device = device;
     device.addEventListener('gattserverdisconnected', () => this.handleDisconnect());
@@ -43,16 +46,31 @@ export class PoweredUpController {
     const service = await server.getPrimaryService(SERVICE_UUID);
     const char = await service.getCharacteristic(CHAR_UUID);
     this.characteristic = char;
+    // Detect which write style the characteristic supports. The Powered Up hub
+    // advertises both, but Web Bluetooth implementations sometimes time out the
+    // GATT link when the response handshake is used at high frequency, which
+    // looks like a "shortly after connecting" disconnect. Prefer write-without-
+    // response when available.
+    this.useNoResponse = !!(char.properties.writeWithoutResponse && char.writeValueWithoutResponse);
     await char.startNotifications();
     char.addEventListener('characteristicvaluechanged', (ev) => this.handlePacket(ev.target.value));
+    // Tiny grace period — the hub's GATT server isn't always ready to accept
+    // writes the instant `connect()` resolves.
+    await this.delay(120);
     // Subscribe to remote button events on both ports (mode 0x00, delta 1, notifications enabled).
     await this.writeMessage(this.buildPortInputFormat(0x00));
+    await this.delay(40);
     await this.writeMessage(this.buildPortInputFormat(0x01));
+    // Subscribe to the green centre button on the hub itself (Hub Property 0x02).
+    await this.delay(40);
+    await this.writeMessage(this.buildHubPropertySubscribe(0x02));
     this.connected = true;
     this.setStatus('connected');
     try { localStorage.setItem('zibo.lastDeviceName', device.name || ''); } catch {}
     return true;
   }
+
+  delay(ms) { return new Promise(r => setTimeout(r, ms)); }
 
   buildPortInputFormat(port) {
     // Header: length, hubId(0), msgType=0x41 (Port Input Format Setup),
@@ -61,20 +79,54 @@ export class PoweredUpController {
     return Uint8Array.from(m);
   }
 
+  buildHubPropertySubscribe(prop) {
+    // length=5, hub=0, msg=0x01 (Hub Properties), prop, op=0x02 (enable updates).
+    return Uint8Array.from([0x05, 0x00, 0x01, prop, 0x02]);
+  }
+
   async writeMessage(bytes) {
     if (!this.characteristic) return;
-    try { await this.characteristic.writeValue(bytes); } catch (e) { console.warn('write failed', e); }
+    try {
+      if (this.useNoResponse) await this.characteristic.writeValueWithoutResponse(bytes);
+      else await this.characteristic.writeValue(bytes);
+    } catch (e) {
+      console.warn('PoweredUp write failed', e);
+      // If write-without-response fails (e.g. browser still doesn't expose it),
+      // fall back to the response-style write so we can at least try once.
+      if (this.useNoResponse) {
+        this.useNoResponse = false;
+        try { await this.characteristic.writeValue(bytes); } catch (e2) { console.warn('fallback write failed', e2); }
+      }
+    }
   }
 
   handlePacket(dataView) {
-    // Expect length=5, hubId=0, msgType=0x45 (port value single).
-    if (dataView.byteLength < 5) return;
-    const length = dataView.getUint8(0);
+    if (dataView.byteLength < 3) return;
     const msgType = dataView.getUint8(2);
-    if (msgType !== 0x45) return;
-    const port = dataView.getUint8(3);
-    const value = dataView.getUint8(4);
-    this.dispatchButton(port, value);
+    if (msgType === 0x45) {
+      // Port Value Single — the thumb buttons.
+      if (dataView.byteLength < 5) return;
+      const port = dataView.getUint8(3);
+      const value = dataView.getUint8(4);
+      this.dispatchButton(port, value);
+    } else if (msgType === 0x01) {
+      // Hub Properties update — green centre button (prop 0x02, op 0x06).
+      if (dataView.byteLength < 6) return;
+      const prop = dataView.getUint8(3);
+      const op = dataView.getUint8(4);
+      const value = dataView.getUint8(5);
+      if (prop === 0x02 && op === 0x06) {
+        if (value) {
+          this.input.press(ACTIONS.PAUSE);
+          this.input.release(ACTIONS.PAUSE);
+          this.input.press(ACTIONS.CONFIRM);
+          this.input.release(ACTIONS.CONFIRM);
+        }
+      }
+    } else if (msgType === 0x03) {
+      // Hub Alert — log it so we can see if e.g. the battery is low.
+      console.warn('PoweredUp hub alert', new Uint8Array(dataView.buffer));
+    }
   }
 
   dispatchButton(port, value) {

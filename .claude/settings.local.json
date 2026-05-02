@@ -1,0 +1,7 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(node --check \"c:/Users/felix/Documents/Programming/zibo/src/controllers/poweredup.js\" \"c:/Users/felix/Documents/Programming/zibo/src/levels/levelData.js\")"
+    ]
+  }
+}
