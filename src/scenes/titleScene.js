@@ -64,9 +64,13 @@ export class TitleScene {
     r.text("Zibo's Cosmic Quest", LOGICAL_W / 2, 130, { size: 76, align: 'center', color: '#ffd84d', shadow: '#1a0840' });
     r.text(t('title.tagline'), LOGICAL_W / 2, 210, { size: 24, align: 'center', color: '#fff', weight: '500' });
 
-    // Zibo waves
-    const bob = Math.sin(this.t * 2) * 6;
-    r.drawZibo(LOGICAL_W / 2 - 24, 280 + bob, { facing: 1, frame: Math.floor(this.t * 4) });
+    // Zibo waves (cheering pose hops + raises arms — matches the SPEC §7.1 brief).
+    r.drawZibo(LOGICAL_W / 2 - 24, 280, {
+      facing: 1,
+      frame: Math.floor(this.t * 4),
+      cheering: true,
+      grounded: true
+    });
 
     // Menu items
     const items = this.items();

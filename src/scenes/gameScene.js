@@ -477,14 +477,23 @@ export class GameScene {
 
   drawZibo(r) {
     const z = this.zibo;
-    const blink = z.invulnUntil > this.now && Math.floor(this.now / 80) % 2 === 0;
-    if (blink) return;
+    const flicker = z.invulnUntil > this.now && Math.floor(this.now / 80) % 2 === 0;
+    if (flicker) return;
+    const moving = Math.abs(z.vx) > 10;
+    const opts = {
+      facing: z.facing,
+      frame: z.frame,
+      hurt: z.invulnUntil > this.now,
+      cheering: z.cheering,
+      vy: z.vy,
+      grounded: z.grounded,
+      moving
+    };
     if (z.beaming) {
-      // Sparkle + fade out
       const ctx = r.ctx;
       const a = Math.max(0, 1 - z.beamProgress / 1.4);
       ctx.globalAlpha = a;
-      r.drawZibo(z.spriteX(), z.spriteY(), { facing: z.facing, frame: z.frame });
+      r.drawZibo(z.spriteX(), z.spriteY(), opts);
       ctx.globalAlpha = 1;
       for (let i = 0; i < 8; i++) {
         const a2 = z.beamProgress + i * 0.1;
@@ -497,13 +506,14 @@ export class GameScene {
     }
     if (z.power === 'shield') {
       const ctx = r.ctx;
-      ctx.strokeStyle = 'rgba(127, 211, 255, 0.7)';
+      const t = performance.now();
+      ctx.strokeStyle = `rgba(127, 211, 255, ${0.6 + Math.sin(t / 200) * 0.2})`;
       ctx.lineWidth = 4;
       ctx.beginPath(); ctx.arc(z.x + z.w / 2, z.y + z.h / 2, 36, 0, Math.PI * 2); ctx.stroke();
       ctx.fillStyle = 'rgba(127, 211, 255, 0.18)';
       ctx.beginPath(); ctx.arc(z.x + z.w / 2, z.y + z.h / 2, 36, 0, Math.PI * 2); ctx.fill();
     }
-    r.drawZibo(z.spriteX(), z.spriteY(), { facing: z.facing, frame: z.frame, cheering: z.cheering });
+    r.drawZibo(z.spriteX(), z.spriteY(), opts);
   }
 
   drawDarkOverlay(r) {

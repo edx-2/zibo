@@ -53,103 +53,300 @@ export class Renderer {
 
   // ------ Procedural sprites ------
   drawZibo(x, y, opts = {}) {
-    const { facing = 1, frame = 0, hurt = false, blink = false, cheering = false } = opts;
+    const {
+      facing = 1, frame = 0, hurt = false, blink = false, cheering = false,
+      vy = 0, grounded = true, moving = false
+    } = opts;
     const ctx = this.ctx;
+    const t = performance.now();
+
+    // Pose state — jump stretches, fall squashes, idle breathes, cheer hops.
+    let bodyBob, squashY;
+    if (cheering) {
+      bodyBob = -Math.abs(Math.sin(t / 90)) * 6;
+      squashY = 1 + Math.sin(t / 90) * 0.06;
+    } else if (!grounded) {
+      bodyBob = 0;
+      squashY = vy < -50 ? 1.12 : (vy > 200 ? 0.92 : 1);
+    } else if (moving) {
+      bodyBob = Math.sin(t / 90) * 1.2;
+      squashY = 1 + Math.sin(t / 90) * 0.04;
+    } else {
+      bodyBob = Math.sin(t / 380) * 1.6;
+      squashY = 1 + Math.sin(t / 380) * 0.03;
+    }
+
+    // Auto-blink every ~4s for ~140ms (independent of the invuln blink upstream).
+    const blinkPhase = (t % 4200) / 4200;
+    const autoBlink = blinkPhase > 0.97;
+    const eyesClosed = blink || autoBlink;
+
+    // Drop shadow on ground.
     ctx.save();
     ctx.translate(x, y);
+    if (grounded && !cheering) {
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.22)';
+      ctx.beginPath();
+      ctx.ellipse(24, 49, 18, 3.5, 0, 0, Math.PI * 2);
+      ctx.fill();
+    }
     if (facing < 0) { ctx.translate(48, 0); ctx.scale(-1, 1); }
 
     const skin = hurt ? '#ffffff' : '#7ed957';
-    const skinDark = hurt ? '#cccccc' : '#4ea83a';
-    const eyeY = 22 + (frame % 2) * 1;
-    const bodyBob = cheering ? Math.sin(performance.now() / 80) * 3 : Math.sin(performance.now() / 220) * 1.2;
+    const skinDark = hurt ? '#bbbbbb' : '#3e8a30';
+    const skinLight = hurt ? '#f4f4f4' : '#a8e878';
+    const belly = hurt ? '#e0e0e0' : '#d8f5b3';
 
-    // Antennae
+    // ---------- Antennae ----------
+    const antA = Math.sin(t / 240) * 1.8;
+    const antB = Math.sin(t / 240 + 0.4) * 1.8;
     ctx.strokeStyle = skinDark;
-    ctx.lineWidth = 3;
+    ctx.lineWidth = 2.5;
+    ctx.lineCap = 'round';
     ctx.beginPath();
-    ctx.moveTo(16, 14 + bodyBob);
-    ctx.quadraticCurveTo(12, 4 + bodyBob, 14, -4 + bodyBob);
-    ctx.moveTo(32, 14 + bodyBob);
-    ctx.quadraticCurveTo(36, 4 + bodyBob, 34, -4 + bodyBob);
+    ctx.moveTo(17, 14 + bodyBob);
+    ctx.bezierCurveTo(13 + antA, 4 + bodyBob, 12 + antA, -6 + bodyBob, 13 + antA * 1.4, -10 + bodyBob);
     ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(31, 14 + bodyBob);
+    ctx.bezierCurveTo(35 + antB, 4 + bodyBob, 36 + antB, -6 + bodyBob, 35 + antB * 1.4, -10 + bodyBob);
+    ctx.stroke();
+    // Glowing spheres at the tips.
+    const aGlow = 0.35 + Math.sin(t / 180) * 0.15;
+    ctx.fillStyle = `rgba(255, 220, 100, ${aGlow})`;
+    ctx.beginPath(); ctx.arc(13 + antA * 1.4, -10 + bodyBob, 7, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(35 + antB * 1.4, -10 + bodyBob, 7, 0, Math.PI * 2); ctx.fill();
     ctx.fillStyle = '#ffd84d';
-    ctx.beginPath(); ctx.arc(14, -5 + bodyBob, 3.5, 0, Math.PI * 2); ctx.fill();
-    ctx.beginPath(); ctx.arc(34, -5 + bodyBob, 3.5, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(13 + antA * 1.4, -10 + bodyBob, 4, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(35 + antB * 1.4, -10 + bodyBob, 4, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#fff8c5';
+    ctx.beginPath(); ctx.arc(12 + antA * 1.4, -11 + bodyBob, 1.6, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(34 + antB * 1.4, -11 + bodyBob, 1.6, 0, Math.PI * 2); ctx.fill();
 
-    // Body
+    // ---------- Body with squash/stretch + shading ----------
+    const bw = 18 / Math.sqrt(squashY);
+    const bh = 16 * squashY;
+    // Outline
+    ctx.strokeStyle = skinDark;
+    ctx.lineWidth = 1.5;
     ctx.fillStyle = skin;
     ctx.beginPath();
-    ctx.ellipse(24, 24 + bodyBob, 18, 16, 0, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.fillStyle = skinDark;
+    ctx.ellipse(24, 24 + bodyBob, bw, bh, 0, 0, Math.PI * 2);
+    ctx.fill(); ctx.stroke();
+    // Belly patch (lighter oval, lower-front)
+    ctx.fillStyle = belly;
     ctx.beginPath();
-    ctx.ellipse(24, 32 + bodyBob, 16, 6, 0, 0, Math.PI * 2);
+    ctx.ellipse(24, 30 + bodyBob, bw * 0.65, bh * 0.55, 0, 0, Math.PI * 2);
+    ctx.fill();
+    // Top-left highlight
+    ctx.fillStyle = skinLight;
+    ctx.beginPath();
+    ctx.ellipse(17, 18 + bodyBob, 4, 7, -0.5, 0, Math.PI * 2);
     ctx.fill();
 
-    // Eyes
-    ctx.fillStyle = '#fff';
-    ctx.beginPath(); ctx.arc(18, eyeY + bodyBob, 6, 0, Math.PI * 2); ctx.fill();
-    ctx.beginPath(); ctx.arc(30, eyeY + bodyBob, 6, 0, Math.PI * 2); ctx.fill();
-    if (!blink) {
-      ctx.fillStyle = '#1a0a30';
-      ctx.beginPath(); ctx.arc(19, eyeY + 1 + bodyBob, 3, 0, Math.PI * 2); ctx.fill();
-      ctx.beginPath(); ctx.arc(31, eyeY + 1 + bodyBob, 3, 0, Math.PI * 2); ctx.fill();
-      ctx.fillStyle = '#fff';
-      ctx.beginPath(); ctx.arc(20, eyeY + bodyBob, 1.2, 0, Math.PI * 2); ctx.fill();
-      ctx.beginPath(); ctx.arc(32, eyeY + bodyBob, 1.2, 0, Math.PI * 2); ctx.fill();
-    } else {
-      ctx.strokeStyle = '#1a0a30';
-      ctx.lineWidth = 2;
+    // ---------- Arms (small stubs) ----------
+    const armPhase = (frame % 6) / 6 * Math.PI * 2;
+    const armSwing = (moving && grounded) ? Math.sin(armPhase) * 3 : 0;
+    const armUp = cheering ? -16 : 0;
+    ctx.fillStyle = skin;
+    ctx.strokeStyle = skinDark;
+    ctx.lineWidth = 1.5;
+    if (cheering) {
+      // Arms raised in V
       ctx.beginPath();
-      ctx.moveTo(14, eyeY + bodyBob); ctx.lineTo(22, eyeY + bodyBob);
-      ctx.moveTo(26, eyeY + bodyBob); ctx.lineTo(34, eyeY + bodyBob);
+      ctx.ellipse(7, 14 + bodyBob, 3, 8, 0.35, 0, Math.PI * 2);
+      ctx.fill(); ctx.stroke();
+      ctx.beginPath();
+      ctx.ellipse(41, 14 + bodyBob, 3, 8, -0.35, 0, Math.PI * 2);
+      ctx.fill(); ctx.stroke();
+      ctx.fillStyle = '#fff';
+      ctx.beginPath(); ctx.arc(5, 8 + bodyBob, 4, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.arc(43, 8 + bodyBob, 4, 0, Math.PI * 2); ctx.fill();
+      ctx.strokeStyle = '#aaa'; ctx.beginPath(); ctx.arc(5, 8 + bodyBob, 4, 0, Math.PI * 2); ctx.stroke();
+      ctx.beginPath(); ctx.arc(43, 8 + bodyBob, 4, 0, Math.PI * 2); ctx.stroke();
+    } else {
+      // Resting arms with tiny walk swing
+      ctx.beginPath();
+      ctx.ellipse(8, 27 + bodyBob - armSwing, 3.2, 6, 0.25, 0, Math.PI * 2);
+      ctx.fill(); ctx.stroke();
+      ctx.beginPath();
+      ctx.ellipse(40, 27 + bodyBob + armSwing, 3.2, 6, -0.25, 0, Math.PI * 2);
+      ctx.fill(); ctx.stroke();
+      // Gloves
+      ctx.fillStyle = '#fff';
+      ctx.beginPath(); ctx.arc(8, 32 + bodyBob - armSwing, 3.5, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.arc(40, 32 + bodyBob + armSwing, 3.5, 0, Math.PI * 2); ctx.fill();
+      ctx.strokeStyle = '#aaa';
+      ctx.beginPath(); ctx.arc(8, 32 + bodyBob - armSwing, 3.5, 0, Math.PI * 2); ctx.stroke();
+      ctx.beginPath(); ctx.arc(40, 32 + bodyBob + armSwing, 3.5, 0, Math.PI * 2); ctx.stroke();
+    }
+
+    // ---------- Eyes ----------
+    const eyeY = 22 + bodyBob;
+    // Whites
+    ctx.fillStyle = '#fff';
+    ctx.beginPath(); ctx.arc(18, eyeY, 6.5, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(30, eyeY, 6.5, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = skinDark;
+    ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.arc(18, eyeY, 6.5, 0, Math.PI * 2); ctx.stroke();
+    ctx.beginPath(); ctx.arc(30, eyeY, 6.5, 0, Math.PI * 2); ctx.stroke();
+
+    if (!eyesClosed) {
+      // Pupils — drift toward facing/motion direction.
+      const lookX = (moving && grounded) ? 1.2 : 0;
+      const lookY = !grounded ? (vy < 0 ? -1 : 1) : 0;
+      ctx.fillStyle = '#1a0a30';
+      ctx.beginPath(); ctx.arc(18 + lookX, eyeY + 1 + lookY, 3.4, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.arc(30 + lookX, eyeY + 1 + lookY, 3.4, 0, Math.PI * 2); ctx.fill();
+      // Primary sparkles
+      ctx.fillStyle = '#fff';
+      ctx.beginPath(); ctx.arc(19.5 + lookX, eyeY + lookY, 1.5, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.arc(31.5 + lookX, eyeY + lookY, 1.5, 0, Math.PI * 2); ctx.fill();
+      // Secondary sparkles
+      ctx.beginPath(); ctx.arc(17 + lookX, eyeY + 2.5 + lookY, 0.7, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.arc(29 + lookX, eyeY + 2.5 + lookY, 0.7, 0, Math.PI * 2); ctx.fill();
+    } else {
+      // Happy closed eyes — curved arcs.
+      ctx.strokeStyle = '#1a0a30';
+      ctx.lineWidth = 1.8;
+      ctx.lineCap = 'round';
+      ctx.beginPath();
+      ctx.arc(18, eyeY + 1, 5, Math.PI * 0.15, Math.PI * 0.85);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.arc(30, eyeY + 1, 5, Math.PI * 0.15, Math.PI * 0.85);
       ctx.stroke();
     }
 
-    // Mouth
-    ctx.strokeStyle = '#1a0a30';
-    ctx.lineWidth = 2;
-    ctx.beginPath();
-    if (cheering) { ctx.arc(24, 32 + bodyBob, 3, 0, Math.PI); }
-    else { ctx.moveTo(20, 33 + bodyBob); ctx.quadraticCurveTo(24, 36 + bodyBob, 28, 33 + bodyBob); }
-    ctx.stroke();
+    // ---------- Cheek blush ----------
+    ctx.fillStyle = `rgba(255, 130, 165, ${cheering ? 0.65 : 0.42})`;
+    ctx.beginPath(); ctx.arc(11, 30 + bodyBob, 2.6, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(37, 30 + bodyBob, 2.6, 0, Math.PI * 2); ctx.fill();
 
-    // Boots
-    const legPhase = (frame % 6) / 6;
-    const legA = Math.sin(legPhase * Math.PI * 2) * 2;
-    ctx.fillStyle = '#ddd';
-    ctx.fillRect(14, 38 + legA + bodyBob, 8, 8);
-    ctx.fillRect(26, 38 - legA + bodyBob, 8, 8);
-    ctx.fillStyle = '#999';
-    ctx.fillRect(14, 44 + legA + bodyBob, 8, 2);
-    ctx.fillRect(26, 44 - legA + bodyBob, 8, 2);
+    // ---------- Mouth ----------
+    ctx.strokeStyle = '#1a0a30';
+    ctx.lineWidth = 1.8;
+    ctx.lineCap = 'round';
+    if (cheering) {
+      // Wide open smile with tongue.
+      ctx.fillStyle = '#3a1a4a';
+      ctx.beginPath();
+      ctx.ellipse(24, 34 + bodyBob, 5.5, 3.5, 0, 0, Math.PI);
+      ctx.fill();
+      ctx.fillStyle = '#ff6b94';
+      ctx.beginPath();
+      ctx.ellipse(24, 35.5 + bodyBob, 3, 1.5, 0, 0, Math.PI);
+      ctx.fill();
+      ctx.beginPath();
+      ctx.arc(24, 34 + bodyBob, 5.5, 0, Math.PI);
+      ctx.stroke();
+    } else if (!grounded) {
+      // Surprised "o" mouth.
+      ctx.fillStyle = '#3a1a4a';
+      ctx.beginPath();
+      ctx.ellipse(24, 34 + bodyBob, 1.8, 2.2, 0, 0, Math.PI * 2);
+      ctx.fill();
+    } else if (hurt) {
+      ctx.beginPath();
+      ctx.moveTo(20, 36 + bodyBob);
+      ctx.quadraticCurveTo(24, 33 + bodyBob, 28, 36 + bodyBob);
+      ctx.stroke();
+    } else {
+      // Relaxed smile.
+      ctx.beginPath();
+      ctx.moveTo(20, 33 + bodyBob);
+      ctx.quadraticCurveTo(24, 36.5 + bodyBob, 28, 33 + bodyBob);
+      ctx.stroke();
+    }
+
+    // ---------- Boots ----------
+    const legPhase = (frame % 6) / 6 * Math.PI * 2;
+    let legA, legB;
+    if (cheering) {
+      legA = -3 + Math.sin(t / 90) * 1.5;
+      legB = legA;
+    } else if (!grounded) {
+      // Legs tucked when ascending, spread on descent.
+      legA = vy < -50 ? -3 : (vy > 200 ? 5 : 0);
+      legB = legA;
+    } else if (moving) {
+      legA = Math.sin(legPhase) * 4;
+      legB = -legA;
+    } else {
+      legA = 0; legB = 0;
+    }
+    // Boot bodies — rounded with cuff.
+    const drawBoot = (cx, dy) => {
+      ctx.fillStyle = '#fff';
+      ctx.fillRect(cx - 4, 36 + dy + bodyBob, 8, 4); // sock cuff
+      ctx.strokeStyle = '#aaa';
+      ctx.lineWidth = 1;
+      ctx.strokeRect(cx - 4, 36 + dy + bodyBob, 8, 4);
+      ctx.fillStyle = '#e0e6ed';
+      ctx.beginPath();
+      ctx.ellipse(cx, 42 + dy + bodyBob, 5, 4.5, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = '#5b6772';
+      ctx.lineWidth = 1.2;
+      ctx.stroke();
+      ctx.fillStyle = '#5b6772';
+      ctx.fillRect(cx - 5, 45 + dy + bodyBob, 10, 1.8);
+    };
+    drawBoot(16, legA);
+    drawBoot(32, legB);
+
     ctx.restore();
+  }
+
+  // Brief running-dust puff. Caller decides when to spawn (e.g. on landing).
+  drawDust(x, y, age) {
+    const ctx = this.ctx;
+    const a = Math.max(0, 1 - age / 0.4);
+    ctx.fillStyle = `rgba(220, 220, 230, ${a * 0.6})`;
+    const r = 3 + age * 14;
+    ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill();
   }
 
   drawStar(x, y, r = 14, color = '#ffd84d', glow = true) {
     const ctx = this.ctx;
+    const t = performance.now();
     if (glow) {
-      ctx.fillStyle = 'rgba(255, 216, 77, 0.18)';
-      ctx.beginPath(); ctx.arc(x, y, r * 2, 0, Math.PI * 2); ctx.fill();
+      const pulse = 0.18 + Math.sin(t / 220 + x * 0.01) * 0.08;
+      ctx.fillStyle = `rgba(255, 216, 77, ${pulse})`;
+      ctx.beginPath(); ctx.arc(x, y, r * 2.2, 0, Math.PI * 2); ctx.fill();
     }
+    // Slow rotation makes pickups feel alive.
+    const rot = Math.sin(t / 700 + x * 0.002) * 0.15;
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.rotate(rot);
     ctx.fillStyle = color;
     ctx.beginPath();
     for (let i = 0; i < 5; i++) {
       const a = -Math.PI / 2 + i * (Math.PI * 2 / 5);
       const a2 = a + Math.PI / 5;
-      ctx.lineTo(x + Math.cos(a) * r, y + Math.sin(a) * r);
-      ctx.lineTo(x + Math.cos(a2) * r * 0.45, y + Math.sin(a2) * r * 0.45);
+      ctx.lineTo(Math.cos(a) * r, Math.sin(a) * r);
+      ctx.lineTo(Math.cos(a2) * r * 0.45, Math.sin(a2) * r * 0.45);
     }
     ctx.closePath();
     ctx.fill();
+    // Inner shine
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.6)';
+    ctx.beginPath();
+    ctx.ellipse(-r * 0.25, -r * 0.3, r * 0.18, r * 0.35, -0.4, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
   }
 
   drawHeart(x, y, r = 14, filled = true) {
     const ctx = this.ctx;
+    const t = performance.now();
+    const beat = filled ? 1 + Math.sin(t / 360) * 0.06 : 1;
     ctx.save();
     ctx.translate(x, y);
-    ctx.fillStyle = filled ? '#ff5ea1' : 'rgba(255, 94, 161, 0.25)';
+    ctx.scale(beat, beat);
+    ctx.fillStyle = filled ? '#ff5ea1' : 'rgba(255, 94, 161, 0.22)';
     ctx.strokeStyle = '#a8205c';
     ctx.lineWidth = 2;
     ctx.beginPath();
@@ -160,6 +357,13 @@ export class Renderer {
     ctx.bezierCurveTo(-r * 0.6, r * 0.5, -r * 0.4, r * 0.7, 0, r * 0.4);
     ctx.fill();
     ctx.stroke();
+    if (filled) {
+      // Highlight glint.
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.65)';
+      ctx.beginPath();
+      ctx.ellipse(-r * 0.3, -r * 0.2, r * 0.18, r * 0.28, -0.3, 0, Math.PI * 2);
+      ctx.fill();
+    }
     ctx.restore();
   }
 

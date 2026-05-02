@@ -132,7 +132,16 @@ export class LevelSelectScene {
     });
 
     // Zibo walking on the map
-    r.drawZibo(this.zSpriteX - 24, this.zSpriteY - 80, { facing: 1, frame: Math.floor(this.t * 12) });
+    const target = POSITIONS[this.sel];
+    const dx = target.x - this.zSpriteX;
+    const facing = Math.abs(dx) > 4 ? Math.sign(dx) : 1;
+    const moving = Math.abs(dx) > 4;
+    r.drawZibo(this.zSpriteX - 24, this.zSpriteY - 80, {
+      facing,
+      frame: Math.floor(this.t * 12),
+      moving,
+      grounded: true
+    });
 
     r.text('← →   ✓', LOGICAL_W / 2, LOGICAL_H - 30, { size: 18, align: 'center', color: 'rgba(255,255,255,0.5)' });
   }
