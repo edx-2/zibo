@@ -390,64 +390,327 @@ export class Renderer {
 
   drawRocketPart(x, y, kind = 'engine', t = 0) {
     const ctx = this.ctx;
-    const glow = 18 + Math.sin(t / 200) * 4;
-    ctx.fillStyle = 'rgba(255, 216, 77, 0.28)';
-    ctx.beginPath(); ctx.arc(x, y, glow + 18, 0, Math.PI * 2); ctx.fill();
-    ctx.fillStyle = 'rgba(255, 240, 140, 0.5)';
-    ctx.beginPath(); ctx.arc(x, y, glow, 0, Math.PI * 2); ctx.fill();
+    const pulse = Math.sin(t / 240);
+
+    // Pulsing yellow halo + sparkle ring so the part reads as "important pickup".
+    ctx.fillStyle = `rgba(255, 216, 77, ${0.18 + pulse * 0.06})`;
+    ctx.beginPath(); ctx.arc(x, y, 38 + pulse * 3, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = 'rgba(255, 240, 140, 0.45)';
+    ctx.beginPath(); ctx.arc(x, y, 22, 0, Math.PI * 2); ctx.fill();
+    // Orbiting sparkles
+    for (let i = 0; i < 4; i++) {
+      const a = t / 500 + i * (Math.PI / 2);
+      const r = 28 + Math.sin(t / 200 + i) * 2;
+      ctx.fillStyle = `rgba(255, 255, 255, ${0.6 + Math.sin(a * 2) * 0.3})`;
+      ctx.beginPath(); ctx.arc(x + Math.cos(a) * r, y + Math.sin(a) * r, 1.6, 0, Math.PI * 2); ctx.fill();
+    }
+
     ctx.save();
     ctx.translate(x, y);
-    ctx.fillStyle = '#e0e6ed';
-    ctx.strokeStyle = '#5b6772';
-    ctx.lineWidth = 2;
+
+    const metal = '#e8eef5';
+    const metalDark = '#5b6772';
+    const metalShade = '#aab4c0';
+
     if (kind === 'engine') {
-      ctx.fillRect(-14, -10, 28, 18);
-      ctx.strokeRect(-14, -10, 28, 18);
+      // Combustion bell + nozzle.
+      ctx.fillStyle = metal;
+      ctx.strokeStyle = metalDark;
+      ctx.lineWidth = 2;
+      // Bell (trapezoid)
+      ctx.beginPath();
+      ctx.moveTo(-10, -10); ctx.lineTo(10, -10); ctx.lineTo(16, 14); ctx.lineTo(-16, 14);
+      ctx.closePath(); ctx.fill(); ctx.stroke();
+      // Bell shading
+      ctx.fillStyle = metalShade;
+      ctx.beginPath();
+      ctx.moveTo(4, -10); ctx.lineTo(10, -10); ctx.lineTo(16, 14); ctx.lineTo(8, 14);
+      ctx.closePath(); ctx.fill();
+      // Top mount cap
+      ctx.fillStyle = metalDark;
+      ctx.fillRect(-8, -16, 16, 6);
+      ctx.strokeRect(-8, -16, 16, 6);
+      // Inner glow (combustion)
+      ctx.fillStyle = '#ffb84d';
+      ctx.beginPath();
+      ctx.moveTo(-12, 12); ctx.lineTo(-6, -6); ctx.lineTo(6, -6); ctx.lineTo(12, 12);
+      ctx.closePath(); ctx.fill();
       ctx.fillStyle = '#ff7e3a';
       ctx.beginPath();
-      ctx.moveTo(-10, 8); ctx.lineTo(0, 22); ctx.lineTo(10, 8);
-      ctx.fill();
+      ctx.moveTo(-7, 12); ctx.lineTo(-3, -2); ctx.lineTo(3, -2); ctx.lineTo(7, 12);
+      ctx.closePath(); ctx.fill();
+      // Highlight
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.45)';
+      ctx.fillRect(-13, -8, 3, 18);
+
     } else if (kind === 'fin') {
+      // Curved triangular fin with leading-edge accent.
+      ctx.fillStyle = metal;
+      ctx.strokeStyle = metalDark;
+      ctx.lineWidth = 2;
       ctx.beginPath();
-      ctx.moveTo(-16, 14); ctx.lineTo(0, -16); ctx.lineTo(16, 14); ctx.closePath();
-      ctx.fill(); ctx.stroke();
+      ctx.moveTo(-16, 16);
+      ctx.bezierCurveTo(-20, 6, -10, -10, 0, -18);
+      ctx.bezierCurveTo(8, -8, 14, 8, 16, 16);
+      ctx.closePath(); ctx.fill(); ctx.stroke();
+      // Coloured accent stripe along leading edge
+      ctx.fillStyle = '#ff5e5e';
+      ctx.beginPath();
+      ctx.moveTo(-2, -18);
+      ctx.bezierCurveTo(6, -8, 12, 6, 14, 14);
+      ctx.lineTo(8, 14);
+      ctx.bezierCurveTo(6, 6, 2, -6, -2, -16);
+      ctx.closePath(); ctx.fill();
+      // Highlight
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.5)';
+      ctx.beginPath();
+      ctx.ellipse(-8, 2, 2, 7, -0.3, 0, Math.PI * 2); ctx.fill();
+
     } else if (kind === 'hatch') {
-      ctx.beginPath(); ctx.arc(0, 0, 16, 0, Math.PI * 2);
-      ctx.fill(); ctx.stroke();
-      ctx.fillStyle = '#7fd3ff'; ctx.beginPath(); ctx.arc(0, 0, 9, 0, Math.PI * 2); ctx.fill();
-    } else if (kind === 'antenna') {
-      ctx.fillRect(-2, -16, 4, 24);
-      ctx.beginPath(); ctx.arc(0, -18, 6, 0, Math.PI * 2); ctx.fill();
-    } else if (kind === 'panel') {
-      ctx.fillRect(-18, -10, 36, 20);
-      ctx.strokeRect(-18, -10, 36, 20);
-      ctx.fillStyle = '#5da7ff';
-      for (let i = 0; i < 4; i++) ctx.fillRect(-16 + i * 9, -8, 7, 16);
-    } else if (kind === 'cone') {
-      ctx.beginPath();
-      ctx.moveTo(-14, 12); ctx.lineTo(0, -16); ctx.lineTo(14, 12);
-      ctx.closePath(); ctx.fill(); ctx.stroke();
-    } else if (kind === 'gear') {
+      // Round porthole — rim, glass, reflection, rivets.
+      ctx.fillStyle = metalShade;
+      ctx.beginPath(); ctx.arc(0, 0, 17, 0, Math.PI * 2); ctx.fill();
+      ctx.strokeStyle = metalDark;
+      ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.arc(0, 0, 17, 0, Math.PI * 2); ctx.stroke();
+      // Rivets around the rim
+      ctx.fillStyle = metalDark;
       for (let i = 0; i < 8; i++) {
-        const a = i / 8 * Math.PI * 2;
-        ctx.fillRect(Math.cos(a) * 14 - 3, Math.sin(a) * 14 - 3, 6, 6);
+        const a = i * Math.PI / 4;
+        ctx.beginPath();
+        ctx.arc(Math.cos(a) * 14, Math.sin(a) * 14, 1.4, 0, Math.PI * 2);
+        ctx.fill();
       }
-      ctx.beginPath(); ctx.arc(0, 0, 10, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+      // Glass — sky-blue gradient
+      const g = ctx.createRadialGradient(-3, -3, 1, 0, 0, 11);
+      g.addColorStop(0, '#cef0ff');
+      g.addColorStop(1, '#3a96d5');
+      ctx.fillStyle = g;
+      ctx.beginPath(); ctx.arc(0, 0, 11, 0, Math.PI * 2); ctx.fill();
+      // Reflection sheen
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.55)';
+      ctx.beginPath();
+      ctx.ellipse(-3, -4, 3, 6, -0.5, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.3)';
+      ctx.beginPath();
+      ctx.ellipse(4, 4, 1.5, 2.5, -0.5, 0, Math.PI * 2); ctx.fill();
+
+    } else if (kind === 'antenna') {
+      // Antenna base + tapered shaft + glowing dish + spark.
+      ctx.fillStyle = metalDark;
+      ctx.beginPath();
+      ctx.moveTo(-8, 16); ctx.lineTo(-5, 4); ctx.lineTo(5, 4); ctx.lineTo(8, 16);
+      ctx.closePath(); ctx.fill();
+      ctx.fillStyle = metal;
+      ctx.fillRect(-1.5, -14, 3, 18);
+      // Mid-shaft segments
+      ctx.fillStyle = metalDark;
+      ctx.fillRect(-3, -2, 6, 1.5);
+      ctx.fillRect(-3, -8, 6, 1.5);
+      // Dish/sphere on top
+      ctx.fillStyle = metal;
+      ctx.beginPath(); ctx.arc(0, -18, 6, 0, Math.PI * 2); ctx.fill();
+      ctx.strokeStyle = metalDark; ctx.lineWidth = 1.5;
+      ctx.stroke();
+      // Spark from tip
+      ctx.fillStyle = `rgba(255, 240, 140, ${0.5 + Math.sin(t / 80) * 0.4})`;
+      ctx.beginPath(); ctx.arc(0, -22, 2.5 + Math.sin(t / 80) * 1, 0, Math.PI * 2); ctx.fill();
+      // Highlight on sphere
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.6)';
+      ctx.beginPath(); ctx.arc(-2, -20, 1.4, 0, Math.PI * 2); ctx.fill();
+
+    } else if (kind === 'panel') {
+      // Solar panel — frame + grid of photovoltaic cells.
+      ctx.fillStyle = metalDark;
+      ctx.fillRect(-20, -12, 40, 24);
+      ctx.fillStyle = '#1a3050';
+      ctx.fillRect(-18, -10, 36, 20);
+      // Cell grid (4 wide × 2 tall)
+      for (let i = 0; i < 4; i++) {
+        for (let j = 0; j < 2; j++) {
+          const cx = -16 + i * 9, cy = -8 + j * 10;
+          ctx.fillStyle = '#5da7ff';
+          ctx.fillRect(cx, cy, 7, 8);
+          // Cell highlight
+          ctx.fillStyle = 'rgba(255, 255, 255, 0.25)';
+          ctx.fillRect(cx + 0.5, cy + 0.5, 2.5, 2.5);
+        }
+      }
+      // Centre support beam
+      ctx.fillStyle = metalShade;
+      ctx.fillRect(-1, -12, 2, 24);
+
+    } else if (kind === 'cone') {
+      // Nose cone — pointy with red/white candy stripes.
+      ctx.fillStyle = metal;
+      ctx.strokeStyle = metalDark;
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(0, -18);
+      ctx.bezierCurveTo(8, -14, 14, 4, 14, 14);
+      ctx.lineTo(-14, 14);
+      ctx.bezierCurveTo(-14, 4, -8, -14, 0, -18);
+      ctx.closePath(); ctx.fill(); ctx.stroke();
+      // Red stripes
+      ctx.fillStyle = '#ff5e5e';
+      for (let i = 0; i < 3; i++) {
+        const yy = -8 + i * 8;
+        ctx.beginPath();
+        ctx.ellipse(0, yy, 8 + i * 2.5, 2.5, 0, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      // Highlight stripe
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.5)';
+      ctx.beginPath();
+      ctx.ellipse(-5, -2, 2, 8, -0.2, 0, Math.PI * 2); ctx.fill();
+      // Tip ball
+      ctx.fillStyle = metalDark;
+      ctx.beginPath(); ctx.arc(0, -18, 1.8, 0, Math.PI * 2); ctx.fill();
+
+    } else if (kind === 'gear') {
+      // Mechanical gear with teeth + spokes + centre nut.
+      ctx.save();
+      ctx.rotate(t / 1500);
+      const teeth = 10;
+      ctx.fillStyle = metalShade;
+      ctx.strokeStyle = metalDark;
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      for (let i = 0; i < teeth * 2; i++) {
+        const a = i * Math.PI / teeth;
+        const r = i % 2 === 0 ? 17 : 14;
+        const px = Math.cos(a) * r, py = Math.sin(a) * r;
+        if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+      }
+      ctx.closePath();
+      ctx.fill(); ctx.stroke();
+      // Inner ring
+      ctx.fillStyle = metal;
+      ctx.beginPath(); ctx.arc(0, 0, 9, 0, Math.PI * 2); ctx.fill();
+      ctx.stroke();
+      // Spokes
+      ctx.strokeStyle = metalDark; ctx.lineWidth = 1.5;
+      for (let i = 0; i < 4; i++) {
+        const a = i * Math.PI / 2;
+        ctx.beginPath();
+        ctx.moveTo(Math.cos(a) * 4, Math.sin(a) * 4);
+        ctx.lineTo(Math.cos(a) * 9, Math.sin(a) * 9);
+        ctx.stroke();
+      }
+      // Centre nut (hex)
+      ctx.fillStyle = metalDark;
+      ctx.beginPath();
+      for (let i = 0; i < 6; i++) {
+        const a = i * Math.PI / 3;
+        if (i === 0) ctx.moveTo(Math.cos(a) * 4, Math.sin(a) * 4);
+        else ctx.lineTo(Math.cos(a) * 4, Math.sin(a) * 4);
+      }
+      ctx.closePath(); ctx.fill();
+      ctx.restore();
+
     } else if (kind === 'tank') {
-      ctx.beginPath(); ctx.arc(0, 0, 14, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
-      ctx.fillStyle = '#c9d3dc';
-      ctx.beginPath(); ctx.arc(-4, -4, 4, 0, Math.PI * 2); ctx.fill();
+      // Cylindrical fuel tank with valve + gauge.
+      ctx.fillStyle = metal;
+      ctx.strokeStyle = metalDark;
+      ctx.lineWidth = 2;
+      // Body
+      this._roundedRect(ctx, -12, -16, 24, 30, 6);
+      ctx.fill(); ctx.stroke();
+      // Shading stripe
+      ctx.fillStyle = metalShade;
+      this._roundedRect(ctx, 4, -14, 6, 26, 3);
+      ctx.fill();
+      // Highlight stripe
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.45)';
+      this._roundedRect(ctx, -10, -14, 3, 26, 1.5);
+      ctx.fill();
+      // Top valve
+      ctx.fillStyle = metalDark;
+      ctx.fillRect(-3, -20, 6, 6);
+      ctx.fillStyle = '#ff5e5e';
+      ctx.beginPath(); ctx.arc(0, -22, 3.5, 0, Math.PI * 2); ctx.fill();
+      // Pressure gauge
+      ctx.fillStyle = '#fff';
+      ctx.beginPath(); ctx.arc(0, -3, 4, 0, Math.PI * 2); ctx.fill();
+      ctx.strokeStyle = metalDark; ctx.lineWidth = 1;
+      ctx.stroke();
+      ctx.strokeStyle = '#ff5e5e'; ctx.lineWidth = 1.4;
+      ctx.beginPath(); ctx.moveTo(0, -3); ctx.lineTo(2, -5); ctx.stroke();
+
     } else if (kind === 'wing') {
+      // Swept-back wing with red accent + rivets.
+      ctx.fillStyle = metal;
+      ctx.strokeStyle = metalDark;
+      ctx.lineWidth = 2;
       ctx.beginPath();
-      ctx.moveTo(-18, 8); ctx.lineTo(18, -10); ctx.lineTo(18, 10); ctx.lineTo(-10, 14);
+      ctx.moveTo(-18, 12);
+      ctx.bezierCurveTo(-16, 4, 4, -10, 18, -8);
+      ctx.lineTo(18, 4);
+      ctx.bezierCurveTo(8, 8, -4, 14, -18, 14);
       ctx.closePath(); ctx.fill(); ctx.stroke();
+      // Red leading-edge accent
+      ctx.fillStyle = '#ff5e5e';
+      ctx.beginPath();
+      ctx.moveTo(-12, 7);
+      ctx.bezierCurveTo(-4, 0, 6, -7, 16, -6);
+      ctx.lineTo(16, -2);
+      ctx.bezierCurveTo(6, -3, -2, 4, -10, 11);
+      ctx.closePath(); ctx.fill();
+      // Rivets
+      ctx.fillStyle = metalDark;
+      for (let i = 0; i < 4; i++) {
+        ctx.beginPath();
+        ctx.arc(-10 + i * 8, 9, 1.2, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
     } else if (kind === 'crystal') {
-      ctx.fillStyle = '#a3f0ff';
+      // Multifaceted glowing crystal.
+      ctx.strokeStyle = '#3aaecf';
+      ctx.lineWidth = 2;
+      // Back facet (darker)
+      ctx.fillStyle = '#5fc8e0';
       ctx.beginPath();
-      ctx.moveTo(0, -18); ctx.lineTo(12, 0); ctx.lineTo(6, 16); ctx.lineTo(-6, 16); ctx.lineTo(-12, 0);
-      ctx.closePath(); ctx.fill(); ctx.stroke();
+      ctx.moveTo(0, -20); ctx.lineTo(14, -2); ctx.lineTo(8, 18); ctx.lineTo(-8, 18); ctx.lineTo(-14, -2);
+      ctx.closePath(); ctx.fill();
+      ctx.stroke();
+      // Front facet (lighter)
+      ctx.fillStyle = '#a8eaff';
+      ctx.beginPath();
+      ctx.moveTo(0, -20); ctx.lineTo(0, 18); ctx.lineTo(-8, 18); ctx.lineTo(-14, -2);
+      ctx.closePath(); ctx.fill();
+      // Internal facet lines
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.7)';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(0, -20); ctx.lineTo(0, 18);
+      ctx.moveTo(-14, -2); ctx.lineTo(14, -2);
+      ctx.stroke();
+      // Highlight
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.85)';
+      ctx.beginPath();
+      ctx.moveTo(-3, -16); ctx.lineTo(-1, -16); ctx.lineTo(-6, 6); ctx.lineTo(-8, 6);
+      ctx.closePath(); ctx.fill();
+      // Faint sparkle on tip
+      ctx.fillStyle = `rgba(255, 255, 255, ${0.5 + Math.sin(t / 200) * 0.4})`;
+      ctx.beginPath(); ctx.arc(0, -20, 2 + Math.sin(t / 200) * 0.5, 0, Math.PI * 2); ctx.fill();
     }
     ctx.restore();
+  }
+
+  // Helper for rounded rectangles in entity drawings.
+  _roundedRect(ctx, x, y, w, h, r) {
+    ctx.beginPath();
+    ctx.moveTo(x + r, y);
+    ctx.lineTo(x + w - r, y);
+    ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+    ctx.lineTo(x + w, y + h - r);
+    ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+    ctx.lineTo(x + r, y + h);
+    ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+    ctx.lineTo(x, y + r);
+    ctx.quadraticCurveTo(x, y, x + r, y);
+    ctx.closePath();
   }
 
   drawPowerUp(x, y, kind, t = 0) {

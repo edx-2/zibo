@@ -308,39 +308,43 @@ export class GameScene {
   }
 
   updateSequence(dt, now) {
-    // Demo loop: flash blocks 0,1,2,... in index order three times before accepting input.
+    // Demo loop: flash blocks in `index` order three times before accepting
+    // input. Each step lasts 0.85 s so a 5-year-old has time to read it.
+    const STEP = 0.85;
+    const COUNT = this.level.sequenceBlocks.length;
+    const LOOP = STEP * COUNT;
     this.demoSeqTimer += dt;
     if (this.demoSeqLoops < 3) {
-      const phase = this.demoSeqTimer % 1.5;
-      const stepIndex = Math.floor(phase / 0.5);
-      this.demoSeqStep = stepIndex < 3 ? stepIndex : -1;
-      if (this.demoSeqTimer >= 1.5) {
+      const phase = this.demoSeqTimer % LOOP;
+      const stepIndex = Math.floor(phase / STEP);
+      this.demoSeqStep = stepIndex < COUNT ? stepIndex : -1;
+      if (this.demoSeqTimer >= LOOP) {
         this.demoSeqTimer = 0;
         this.demoSeqLoops++;
       }
     } else {
       this.demoSeqStep = -1;
-      // Player input: detect Zibo landing on a block (top contact + downward velocity zeroed).
+      // Player input. Each block can only be activated ONCE per attempt —
+      // standing on an already-activated block is a no-op (so the kid can
+      // pause to think without accidentally resetting the puzzle).
       for (const b of this.level.sequenceBlocks) {
         const onTop = aabb({ x: this.zibo.x, y: this.zibo.y + this.zibo.h - 4, w: this.zibo.w, h: 8 }, b.hitbox());
-        if (onTop && this.zibo.grounded) {
-          if (b.flash <= 0) {
-            b.flash = 0.3;
-            if (b.index === this.seqProgress) {
-              this.seqProgress++;
-              this.app.audio.confirm();
-              b.activated = true;
-              if (this.seqProgress >= this.level.sequenceBlocks.length) {
-                // Find a switch labelled "icebar" linkId and toggle it on permanently.
-                const sw = this.level.switches.find(s => s.linkId === 'icebar');
-                if (sw) sw.press(now);
-                this.app.audio.door();
-              }
-            } else {
-              this.app.audio.hurt();
-              this.seqProgress = 0;
-              for (const block of this.level.sequenceBlocks) block.activated = false;
+        if (onTop && this.zibo.grounded && !b.activated && b.flash <= 0) {
+          b.flash = 0.3;
+          if (b.index === this.seqProgress) {
+            this.seqProgress++;
+            b.activated = true;
+            this.app.audio.confirm();
+            if (this.seqProgress >= COUNT) {
+              const sw = this.level.switches.find(s => s.linkId === 'icebar');
+              if (sw) sw.press(now);
+              this.app.audio.door();
             }
+          } else {
+            // Wrong block — gentle reset, the demo phase isn't replayed.
+            this.app.audio.hurt();
+            this.seqProgress = 0;
+            for (const block of this.level.sequenceBlocks) block.activated = false;
           }
         }
         if (b.flash > 0) b.flash -= dt * 2;
