@@ -346,24 +346,45 @@ export class Renderer {
     ctx.save();
     ctx.translate(x, y);
     ctx.scale(beat, beat);
-    ctx.fillStyle = filled ? '#ff5ea1' : 'rgba(255, 94, 161, 0.22)';
-    ctx.strokeStyle = '#a8205c';
-    ctx.lineWidth = 2;
-    ctx.beginPath();
-    ctx.moveTo(0, r * 0.4);
-    ctx.bezierCurveTo(-r, -r * 0.3, -r * 0.6, -r, 0, -r * 0.3);
-    ctx.bezierCurveTo(r * 0.6, -r, r, -r * 0.3, 0, r * 0.4);
-    ctx.bezierCurveTo(r * 0.4, r * 0.7, r * 0.6, r * 0.5, 0, r);
-    ctx.bezierCurveTo(-r * 0.6, r * 0.5, -r * 0.4, r * 0.7, 0, r * 0.4);
-    ctx.fill();
-    ctx.stroke();
+
+    // Heart path — reused for fill and stroke.
+    const heartPath = () => {
+      ctx.beginPath();
+      ctx.moveTo(0, r * 0.4);
+      ctx.bezierCurveTo(-r, -r * 0.3, -r * 0.6, -r, 0, -r * 0.3);
+      ctx.bezierCurveTo(r * 0.6, -r, r, -r * 0.3, 0, r * 0.4);
+      ctx.bezierCurveTo(r * 0.4, r * 0.7, r * 0.6, r * 0.5, 0, r);
+      ctx.bezierCurveTo(-r * 0.6, r * 0.5, -r * 0.4, r * 0.7, 0, r * 0.4);
+    };
+
     if (filled) {
-      // Highlight glint.
+      // Solid pink heart with a glint.
+      ctx.fillStyle = '#ff5ea1';
+      heartPath();
+      ctx.fill();
+      ctx.strokeStyle = '#a8205c';
+      ctx.lineWidth = 2;
+      heartPath();
+      ctx.stroke();
+      // Highlight glint
       ctx.fillStyle = 'rgba(255, 255, 255, 0.65)';
       ctx.beginPath();
       ctx.ellipse(-r * 0.3, -r * 0.2, r * 0.18, r * 0.28, -0.3, 0, Math.PI * 2);
       ctx.fill();
+    } else {
+      // Empty heart: clearly hollow — faded shape, no warm colour.
+      // A faint inner shadow gives it definition against any background
+      // without resorting to a "broken" slash that would look harsh in a
+      // kids' game.
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.28)';
+      heartPath();
+      ctx.fill();
+      ctx.strokeStyle = 'rgba(255, 200, 220, 0.55)';
+      ctx.lineWidth = 2;
+      heartPath();
+      ctx.stroke();
     }
+
     ctx.restore();
   }
 
