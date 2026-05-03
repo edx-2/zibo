@@ -1,7 +1,8 @@
 {
   "permissions": {
     "allow": [
-      "Bash(node --check \"c:/Users/felix/Documents/Programming/zibo/src/controllers/poweredup.js\" \"c:/Users/felix/Documents/Programming/zibo/src/levels/levelData.js\")"
+      "Bash(node --check \"c:/Users/felix/Documents/Programming/zibo/src/controllers/poweredup.js\" \"c:/Users/felix/Documents/Programming/zibo/src/levels/levelData.js\")",
+      "Bash(node --check \"c:/Users/felix/Documents/Programming/zibo/src/engine/pointer.js\" \"c:/Users/felix/Documents/Programming/zibo/src/main.js\" \"c:/Users/felix/Documents/Programming/zibo/src/scenes/titleScene.js\" \"c:/Users/felix/Documents/Programming/zibo/src/scenes/levelSelectScene.js\" \"c:/Users/felix/Documents/Programming/zibo/src/scenes/settingsScene.js\" \"c:/Users/felix/Documents/Programming/zibo/src/scenes/gameScene.js\" \"c:/Users/felix/Documents/Programming/zibo/src/entities/entities.js\")"
     ]
   }
 }

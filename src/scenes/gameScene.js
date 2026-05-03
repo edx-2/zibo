@@ -64,6 +64,14 @@ export class GameScene {
     this.now = now;
     this.t += dt;
     const input = this.app.input;
+    const pointer = this.app.pointer;
+
+    // HUD pause button (bottom-right). Tappable on mobile.
+    const pauseBtn = this.pauseButtonRect();
+    if (!this.completed && pointer.tappedIn(pauseBtn.x, pauseBtn.y, pauseBtn.w, pauseBtn.h)) {
+      this.paused = !this.paused;
+      this.app.audio.menu();
+    }
 
     if (input.wasPressed(ACTIONS.PAUSE)) {
       if (this.completed) return;
@@ -358,28 +366,67 @@ export class GameScene {
     this.app.audio.rocketPart();
   }
 
+  pauseButtonRect() { return { x: LOGICAL_W - 80, y: LOGICAL_H - 76, w: 64, h: 64 }; }
+  pauseItemRect(i)   { return { x: LOGICAL_W / 2 - 220, y: 300 + i * 80, w: 440, h: 60 }; }
+  skipItemRect(i)    { return { x: LOGICAL_W / 2 - 360 + i * 400, y: 350, w: 320, h: 70 }; }
+
+  doPauseAction(id) {
+    this.app.audio.confirm();
+    if (id === 'resume') this.paused = false;
+    else if (id === 'restart') { this.lastCheckpointSpawn = null; this.deathCount = 0; this.paused = false; this.load(); }
+    else if (id === 'quit') this.app.gotoLevelSelect();
+  }
+
+  doSkipAction(id) {
+    this.app.audio.confirm();
+    if (id === 'retry') { this.deathCount = 0; this.showSkipPrompt = false; }
+    else { this.app.gotoLevelSelect(); }
+  }
+
   handlePauseMenu(input) {
+    const pointer = this.app.pointer;
     const items = ['resume', 'restart', 'quit'];
-    if (input.wasPressed(ACTIONS.MOVE_LEFT)) { this.pauseSel = (this.pauseSel + items.length - 1) % items.length; this.app.audio.menu(); }
-    if (input.wasPressed(ACTIONS.MOVE_RIGHT)) { this.pauseSel = (this.pauseSel + 1) % items.length; this.app.audio.menu(); }
-    if (input.wasPressed(ACTIONS.CONFIRM)) {
-      const sel = items[this.pauseSel];
-      this.app.audio.confirm();
-      if (sel === 'resume') this.paused = false;
-      else if (sel === 'restart') { this.lastCheckpointSpawn = null; this.deathCount = 0; this.paused = false; this.load(); }
-      else if (sel === 'quit') this.app.gotoLevelSelect();
+
+    items.forEach((_, i) => {
+      const rect = this.pauseItemRect(i);
+      if (pointer.hoverIn(rect.x, rect.y, rect.w, rect.h)) this.pauseSel = i;
+    });
+    for (let i = 0; i < items.length; i++) {
+      const rect = this.pauseItemRect(i);
+      if (pointer.tappedIn(rect.x, rect.y, rect.w, rect.h)) {
+        this.pauseSel = i;
+        this.doPauseAction(items[i]);
+        return;
+      }
     }
+
+    if (input.wasPressed(ACTIONS.MOVE_LEFT) || input.wasPressed(ACTIONS.UP))
+      { this.pauseSel = (this.pauseSel + items.length - 1) % items.length; this.app.audio.menu(); }
+    if (input.wasPressed(ACTIONS.MOVE_RIGHT) || input.wasPressed(ACTIONS.DOWN))
+      { this.pauseSel = (this.pauseSel + 1) % items.length; this.app.audio.menu(); }
+    if (input.wasPressed(ACTIONS.CONFIRM)) this.doPauseAction(items[this.pauseSel]);
   }
 
   handleSkipPrompt(input) {
+    const pointer = this.app.pointer;
     const items = ['retry', 'skip'];
+
+    items.forEach((_, i) => {
+      const rect = this.skipItemRect(i);
+      if (pointer.hoverIn(rect.x, rect.y, rect.w, rect.h)) this.skipSel = i;
+    });
+    for (let i = 0; i < items.length; i++) {
+      const rect = this.skipItemRect(i);
+      if (pointer.tappedIn(rect.x, rect.y, rect.w, rect.h)) {
+        this.skipSel = i;
+        this.doSkipAction(items[i]);
+        return;
+      }
+    }
+
     if (input.wasPressed(ACTIONS.MOVE_LEFT)) { this.skipSel = (this.skipSel + 1) % 2; this.app.audio.menu(); }
     if (input.wasPressed(ACTIONS.MOVE_RIGHT)) { this.skipSel = (this.skipSel + 1) % 2; this.app.audio.menu(); }
-    if (input.wasPressed(ACTIONS.CONFIRM)) {
-      this.app.audio.confirm();
-      if (items[this.skipSel] === 'retry') { this.deathCount = 0; this.showSkipPrompt = false; }
-      else { this.app.gotoLevelSelect(); }
-    }
+    if (input.wasPressed(ACTIONS.CONFIRM)) this.doSkipAction(items[this.skipSel]);
   }
 
   draw(r) {
@@ -571,8 +618,48 @@ export class GameScene {
       }
     }
 
-    // Pause icon hint
-    r.text('II', LOGICAL_W - 40, LOGICAL_H - 36, { size: 24, color: 'rgba(255,255,255,0.5)' });
+    // Pause button — tappable, drawn as a rounded card with a pause glyph.
+    const pb = this.pauseButtonRect();
+    const pbHover = this.app.pointer.hoverIn(pb.x, pb.y, pb.w, pb.h);
+    ctx.fillStyle = pbHover ? 'rgba(255, 216, 77, 0.25)' : 'rgba(0, 0, 0, 0.45)';
+    this.roundRect(ctx, pb.x, pb.y, pb.w, pb.h, 12);
+    ctx.fill();
+    ctx.strokeStyle = pbHover ? '#ffd84d' : 'rgba(255, 255, 255, 0.5)';
+    ctx.lineWidth = 2;
+    this.roundRect(ctx, pb.x, pb.y, pb.w, pb.h, 12);
+    ctx.stroke();
+    ctx.fillStyle = '#fff';
+    ctx.fillRect(pb.x + 20, pb.y + 16, 8, 32);
+    ctx.fillRect(pb.x + 36, pb.y + 16, 8, 32);
+  }
+
+  roundRect(ctx, x, y, w, h, radius) {
+    ctx.beginPath();
+    ctx.moveTo(x + radius, y);
+    ctx.lineTo(x + w - radius, y);
+    ctx.quadraticCurveTo(x + w, y, x + w, y + radius);
+    ctx.lineTo(x + w, y + h - radius);
+    ctx.quadraticCurveTo(x + w, y + h, x + w - radius, y + h);
+    ctx.lineTo(x + radius, y + h);
+    ctx.quadraticCurveTo(x, y + h, x, y + h - radius);
+    ctx.lineTo(x, y + radius);
+    ctx.quadraticCurveTo(x, y, x + radius, y);
+    ctx.closePath();
+  }
+
+  drawMenuItem(r, rect, label, sel) {
+    const ctx = r.ctx;
+    ctx.fillStyle = sel ? 'rgba(255, 216, 77, 0.18)' : 'rgba(255, 255, 255, 0.08)';
+    this.roundRect(ctx, rect.x, rect.y, rect.w, rect.h, 14);
+    ctx.fill();
+    ctx.strokeStyle = sel ? '#ffd84d' : 'rgba(255, 255, 255, 0.3)';
+    ctx.lineWidth = 2;
+    this.roundRect(ctx, rect.x, rect.y, rect.w, rect.h, 14);
+    ctx.stroke();
+    r.text(label, rect.x + rect.w / 2, rect.y + rect.h / 2, {
+      size: 32, align: 'center', baseline: 'middle',
+      color: sel ? '#ffd84d' : '#fff', shadow: '#000'
+    });
   }
 
   drawPauseMenu(r) {
@@ -580,11 +667,9 @@ export class GameScene {
     ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
     ctx.fillRect(0, 0, LOGICAL_W, LOGICAL_H);
     r.text(t('pause.title'), LOGICAL_W / 2, 200, { size: 64, align: 'center', color: '#ffd84d', shadow: '#000' });
-    const items = [t('pause.resume'), t('pause.restart'), t('pause.quit')];
-    items.forEach((label, i) => {
-      const y = 320 + i * 70;
-      const sel = i === this.pauseSel;
-      r.text(label, LOGICAL_W / 2, y, { size: 36, align: 'center', color: sel ? '#ffd84d' : '#fff', shadow: '#000' });
+    const labels = [t('pause.resume'), t('pause.restart'), t('pause.quit')];
+    labels.forEach((label, i) => {
+      this.drawMenuItem(r, this.pauseItemRect(i), label, i === this.pauseSel);
     });
   }
 
@@ -593,11 +678,9 @@ export class GameScene {
     ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
     ctx.fillRect(0, 0, LOGICAL_W, LOGICAL_H);
     r.text(t('level.skip'), LOGICAL_W / 2, 240, { size: 48, align: 'center', color: '#fff', shadow: '#000' });
-    const items = [t('level.tryAgain'), t('common.continue')];
-    items.forEach((label, i) => {
-      const x = LOGICAL_W / 2 - 200 + i * 400;
-      const sel = i === this.skipSel;
-      r.text(label, x, 380, { size: 36, align: 'center', color: sel ? '#ffd84d' : '#fff', shadow: '#000' });
+    const labels = [t('level.tryAgain'), t('common.continue')];
+    labels.forEach((label, i) => {
+      this.drawMenuItem(r, this.skipItemRect(i), label, i === this.skipSel);
     });
   }
 

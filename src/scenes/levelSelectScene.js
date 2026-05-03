@@ -17,6 +17,9 @@ const COLORS = {
   volcano: '#e84a3a', palace: '#ffd84d'
 };
 
+const PLANET_RADIUS = 50;        // tap-target radius (a bit larger than the visual planet)
+const BACK_BUTTON = { x: 30, y: 30, w: 110, h: 50 };
+
 export class LevelSelectScene {
   constructor(app) {
     this.app = app;
@@ -38,11 +41,42 @@ export class LevelSelectScene {
   update(dt) {
     this.t += dt;
     const input = this.app.input;
+    const pointer = this.app.pointer;
+    const levels = listLevels();
+
+    // Hover over a planet selects it.
+    levels.forEach((_, i) => {
+      const p = POSITIONS[i];
+      if (pointer.hoverAtCircle(p.x, p.y, PLANET_RADIUS)) this.sel = i;
+    });
+
+    // Tap on a planet enters the level (if unlocked).
+    for (let i = 0; i < levels.length; i++) {
+      const p = POSITIONS[i];
+      if (pointer.tappedAtCircle(p.x, p.y, PLANET_RADIUS)) {
+        const lvl = levels[i];
+        this.sel = i;
+        if (this.app.progress.isUnlocked(lvl.id)) {
+          this.app.audio.confirm();
+          this.app.gotoLevel(lvl.id);
+        } else {
+          this.app.audio.hurt();
+        }
+        return;
+      }
+    }
+    // Tap on the back button returns to title.
+    if (pointer.tappedIn(BACK_BUTTON.x, BACK_BUTTON.y, BACK_BUTTON.w, BACK_BUTTON.h)) {
+      this.app.audio.menu();
+      this.app.gotoTitle();
+      return;
+    }
+
     if (input.wasPressed(ACTIONS.MOVE_LEFT)) { this.advance(-1); }
     if (input.wasPressed(ACTIONS.MOVE_RIGHT)) { this.advance(1); }
     if (input.wasPressed(ACTIONS.PAUSE)) { this.app.gotoTitle(); }
     if (input.wasPressed(ACTIONS.CONFIRM)) {
-      const lvl = listLevels()[this.sel];
+      const lvl = levels[this.sel];
       if (this.app.progress.isUnlocked(lvl.id)) {
         this.app.audio.confirm();
         this.app.gotoLevel(lvl.id);
@@ -80,6 +114,19 @@ export class LevelSelectScene {
       ctx.fillStyle = `rgba(255, 255, 255, ${0.3 + Math.sin(this.t * 2 + i * 0.1) * 0.3})`;
       ctx.fillRect(x, y, 2, 2);
     }
+
+    // Back button (tappable)
+    const backHovered = this.app.pointer.hoverIn(BACK_BUTTON.x, BACK_BUTTON.y, BACK_BUTTON.w, BACK_BUTTON.h);
+    ctx.fillStyle = backHovered ? 'rgba(255, 216, 77, 0.18)' : 'rgba(255, 255, 255, 0.08)';
+    this.roundRect(ctx, BACK_BUTTON.x, BACK_BUTTON.y, BACK_BUTTON.w, BACK_BUTTON.h, 12);
+    ctx.fill();
+    ctx.strokeStyle = backHovered ? '#ffd84d' : 'rgba(255, 255, 255, 0.4)';
+    ctx.lineWidth = 2;
+    this.roundRect(ctx, BACK_BUTTON.x, BACK_BUTTON.y, BACK_BUTTON.w, BACK_BUTTON.h, 12);
+    ctx.stroke();
+    r.text('◀ ' + (t('settings.back') || 'Back'), BACK_BUTTON.x + BACK_BUTTON.w / 2, BACK_BUTTON.y + BACK_BUTTON.h / 2, {
+      size: 22, align: 'center', baseline: 'middle', color: '#fff', shadow: '#000'
+    });
 
     r.text(t('select.title'), LOGICAL_W / 2, 60, { size: 42, align: 'center', color: '#ffd84d', shadow: '#000' });
     const total = this.app.progress.totalStars();
@@ -143,6 +190,21 @@ export class LevelSelectScene {
       grounded: true
     });
 
-    r.text('← →   ✓', LOGICAL_W / 2, LOGICAL_H - 30, { size: 18, align: 'center', color: 'rgba(255,255,255,0.5)' });
+    r.text('← →   ✓   /   ' + (t('controls.tap') || 'Tap'),
+      LOGICAL_W / 2, LOGICAL_H - 30, { size: 18, align: 'center', color: 'rgba(255,255,255,0.5)' });
+  }
+
+  roundRect(ctx, x, y, w, h, radius) {
+    ctx.beginPath();
+    ctx.moveTo(x + radius, y);
+    ctx.lineTo(x + w - radius, y);
+    ctx.quadraticCurveTo(x + w, y, x + w, y + radius);
+    ctx.lineTo(x + w, y + h - radius);
+    ctx.quadraticCurveTo(x + w, y + h, x + w - radius, y + h);
+    ctx.lineTo(x + radius, y + h);
+    ctx.quadraticCurveTo(x, y + h, x, y + h - radius);
+    ctx.lineTo(x, y + radius);
+    ctx.quadraticCurveTo(x, y, x + radius, y);
+    ctx.closePath();
   }
 }

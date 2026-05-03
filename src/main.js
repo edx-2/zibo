@@ -1,6 +1,7 @@
 import { Renderer } from './engine/renderer.js';
 import { Input } from './engine/input.js';
 import { Audio } from './engine/audio.js';
+import { Pointer } from './engine/pointer.js';
 import { attachKeyboard } from './controllers/keyboard.js';
 import { PoweredUpController } from './controllers/poweredup.js';
 import { Progress } from './state/progress.js';
@@ -17,6 +18,7 @@ class App {
     this.renderer = new Renderer(this.canvas);
     this.input = new Input();
     this.audio = new Audio();
+    this.pointer = new Pointer(this.canvas);
     this.progress = new Progress();
     this.poweredUp = new PoweredUpController(this.input);
     this.scene = null;
@@ -72,6 +74,7 @@ class App {
     while (this.accumulator >= this.fixedDt) {
       if (this.scene) this.scene.update(this.fixedDt);
       this.input.endFrame();
+      this.pointer.endFrame();
       this.accumulator -= this.fixedDt;
     }
     if (this.scene) {

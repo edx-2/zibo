@@ -2,6 +2,11 @@ import { ACTIONS } from '../engine/input.js';
 import { LOGICAL_W, LOGICAL_H } from '../engine/renderer.js';
 import { t, setLang, lang } from '../state/i18n.js';
 
+const ITEM_W = 460;
+const ITEM_H = 50;
+const ITEM_BASE_Y = 440;
+const ITEM_SPACING = 60;
+
 export class TitleScene {
   constructor(app) {
     this.app = app;
@@ -19,10 +24,49 @@ export class TitleScene {
     return arr;
   }
 
+  itemRect(i) {
+    return {
+      x: LOGICAL_W / 2 - ITEM_W / 2,
+      y: ITEM_BASE_Y + i * ITEM_SPACING - ITEM_H / 2,
+      w: ITEM_W,
+      h: ITEM_H
+    };
+  }
+
+  activate(id) {
+    this.app.audio.confirm();
+    if (id === 'play') this.app.gotoLevelSelect();
+    else if (id === 'connect') this.app.connectController();
+    else if (id === 'settings') this.app.gotoSettings();
+    else if (id === 'lang') {
+      const next = lang() === 'de' ? 'en' : 'de';
+      setLang(next);
+      this.app.progress.setSetting('language', next);
+    }
+  }
+
   update(dt) {
     this.t += dt;
     const input = this.app.input;
+    const pointer = this.app.pointer;
     const items = this.items();
+
+    // Hover updates highlighted item — useful on desktop, harmless on touch.
+    items.forEach((_, i) => {
+      const r = this.itemRect(i);
+      if (pointer.hoverIn(r.x, r.y, r.w, r.h)) this.sel = i;
+    });
+
+    // Taps directly activate the item under them.
+    for (let i = 0; i < items.length; i++) {
+      const r = this.itemRect(i);
+      if (pointer.tappedIn(r.x, r.y, r.w, r.h)) {
+        this.sel = i;
+        this.activate(items[i].id);
+        return;
+      }
+    }
+
     if (input.wasPressed(ACTIONS.MOVE_LEFT) || input.wasPressed(ACTIONS.UP)) {
       this.sel = (this.sel + items.length - 1) % items.length;
       this.app.audio.menu();
@@ -32,16 +76,7 @@ export class TitleScene {
       this.app.audio.menu();
     }
     if (input.wasPressed(ACTIONS.CONFIRM)) {
-      const id = items[this.sel].id;
-      this.app.audio.confirm();
-      if (id === 'play') this.app.gotoLevelSelect();
-      else if (id === 'connect') this.app.connectController();
-      else if (id === 'settings') this.app.gotoSettings();
-      else if (id === 'lang') {
-        const next = lang() === 'de' ? 'en' : 'de';
-        setLang(next);
-        this.app.progress.setSetting('language', next);
-      }
+      this.activate(items[this.sel].id);
     }
   }
 
@@ -72,16 +107,26 @@ export class TitleScene {
       grounded: true
     });
 
-    // Menu items
+    // Menu items — drawn with a subtle pill background so they look tappable.
     const items = this.items();
     items.forEach((item, i) => {
-      const y = 440 + i * 60;
+      const rect = this.itemRect(i);
       const sel = i === this.sel;
+      // Tap target background
+      ctx.fillStyle = sel ? 'rgba(255, 216, 77, 0.14)' : 'rgba(255, 255, 255, 0.06)';
+      this.roundRect(ctx, rect.x, rect.y, rect.w, rect.h, 14);
+      ctx.fill();
+      ctx.strokeStyle = sel ? 'rgba(255, 216, 77, 0.7)' : 'rgba(255, 255, 255, 0.18)';
+      ctx.lineWidth = 2;
+      this.roundRect(ctx, rect.x, rect.y, rect.w, rect.h, 14);
+      ctx.stroke();
       const color = sel ? '#ffd84d' : '#fff';
-      r.text(item.label, LOGICAL_W / 2, y, { size: 36, align: 'center', color, shadow: '#000' });
+      r.text(item.label, LOGICAL_W / 2, rect.y + ITEM_H / 2, {
+        size: 32, align: 'center', baseline: 'middle', color, shadow: '#000'
+      });
       if (sel) {
-        const x = LOGICAL_W / 2 - 200 - Math.sin(this.t * 8) * 6;
-        r.drawStar(x, y + 18, 14);
+        const x = rect.x + 18 - Math.sin(this.t * 8) * 4;
+        r.drawStar(x, rect.y + ITEM_H / 2, 12);
       }
     });
 
@@ -90,5 +135,19 @@ export class TitleScene {
       r.text(this.connectStatus, LOGICAL_W / 2, LOGICAL_H - 60, { size: 22, align: 'center', color: '#7ed957', shadow: '#000' });
     }
     r.text(t('title.howto'), LOGICAL_W / 2, LOGICAL_H - 28, { size: 18, align: 'center', color: 'rgba(255,255,255,0.6)' });
+  }
+
+  roundRect(ctx, x, y, w, h, radius) {
+    ctx.beginPath();
+    ctx.moveTo(x + radius, y);
+    ctx.lineTo(x + w - radius, y);
+    ctx.quadraticCurveTo(x + w, y, x + w, y + radius);
+    ctx.lineTo(x + w, y + h - radius);
+    ctx.quadraticCurveTo(x + w, y + h, x + w - radius, y + h);
+    ctx.lineTo(x + radius, y + h);
+    ctx.quadraticCurveTo(x, y + h, x, y + h - radius);
+    ctx.lineTo(x, y + radius);
+    ctx.quadraticCurveTo(x, y, x + radius, y);
+    ctx.closePath();
   }
 }

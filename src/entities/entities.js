@@ -260,24 +260,195 @@ export class FallingRock {
 }
 
 export class BouncyMushroom {
-  constructor(x, y, multiplier = 2) { this.id = id(); this.x = x; this.y = y; this.w = 64; this.h = 32; this.multiplier = multiplier; this.t = 0; this.bouncing = 0; }
+  constructor(x, y, multiplier = 2) {
+    this.id = id();
+    this.x = x; this.y = y; this.w = 64; this.h = 32;
+    this.multiplier = multiplier;
+    this.t = 0;
+    this.bouncing = 0;
+    // Slight per-instance phase so a row of mushrooms doesn't pulse in lockstep.
+    this.phase = (x * 0.013 + y * 0.007) % (Math.PI * 2);
+  }
   hitbox() { return { x: this.x, y: this.y, w: this.w, h: this.h }; }
   update(dt) { this.t += dt; if (this.bouncing > 0) this.bouncing -= dt; }
   trigger() { this.bouncing = 0.25; }
+
   draw(r) {
     const ctx = r.ctx;
-    const squash = this.bouncing > 0 ? 1 - this.bouncing * 1.5 : 1;
-    const h = 32 * (1 + (1 - squash) * 0.4);
-    const yo = 32 - h;
-    ctx.fillStyle = '#fff';
-    ctx.fillRect(this.x + 12, this.y + h, 40, 32 - h + 32);
-    ctx.fillStyle = '#ff5e5e';
+    const t = performance.now() / 1000 + this.phase;
+
+    // Squash on bounce; gentle breathing while idle.
+    const bouncing = Math.max(0, this.bouncing);
+    const idleBob = Math.sin(t * 1.4) * 0.05;
+    const squash = bouncing > 0 ? Math.max(0.55, 1 - bouncing * 2.2) : 1 + idleBob;
+    const stretch = 1 / Math.sqrt(squash);
+
+    // Anchor: centre x, ground line at y + 64 (one tile below the hitbox top).
+    const cx = this.x + 32;
+    const groundY = this.y + 60;
+
+    // ----- Drop shadow -----
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.20)';
     ctx.beginPath();
-    ctx.ellipse(this.x + 32, this.y + 16 + yo, 32, 16 + (1 - squash) * 6, 0, 0, Math.PI * 2);
+    ctx.ellipse(cx, groundY + 2, 24 * stretch, 4, 0, 0, Math.PI * 2);
     ctx.fill();
+
+    // ----- Stem (slightly waisted curve) -----
+    const stemTop = this.y + 30;
+    const stemBottom = groundY;
+    const stemHalf = 14 / stretch;
+    ctx.fillStyle = '#fefcff';
+    ctx.beginPath();
+    ctx.moveTo(cx - stemHalf * 0.9, stemTop);
+    ctx.bezierCurveTo(
+      cx - stemHalf * 1.05, stemTop + 8,
+      cx - stemHalf * 1.05, stemBottom - 6,
+      cx - stemHalf * 0.95, stemBottom
+    );
+    ctx.lineTo(cx + stemHalf * 0.95, stemBottom);
+    ctx.bezierCurveTo(
+      cx + stemHalf * 1.05, stemBottom - 6,
+      cx + stemHalf * 1.05, stemTop + 8,
+      cx + stemHalf * 0.9, stemTop
+    );
+    ctx.closePath();
+    ctx.fill();
+    ctx.strokeStyle = '#bbb';
+    ctx.lineWidth = 1.4;
+    ctx.stroke();
+
+    // Stem skirt (the soft ring just under the cap) — lifts when bouncing.
+    const skirtY = stemTop + 4 - bouncing * 4;
+    ctx.fillStyle = '#ffe0d8';
+    ctx.beginPath();
+    ctx.ellipse(cx, skirtY, stemHalf + 6, 5, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = '#bb8888';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+
+    // ----- Cap (red, with shading + spots) -----
+    const capW = 34 * stretch;
+    const capH = 18 * squash + bouncing * 4;
+    const capCY = this.y + 18 - bouncing * 6;
+
+    // Soft underside shadow tucked under the cap dome.
+    ctx.fillStyle = 'rgba(120, 30, 30, 0.35)';
+    ctx.beginPath();
+    ctx.ellipse(cx, capCY + capH * 0.7, capW * 0.85, 5, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Cap fill (radial gradient for shading).
+    const grad = ctx.createRadialGradient(
+      cx - capW * 0.35, capCY - capH * 0.4, 2,
+      cx, capCY, capW
+    );
+    grad.addColorStop(0, '#ff8a8a');
+    grad.addColorStop(0.5, '#ee4848');
+    grad.addColorStop(1, '#b62020');
+    ctx.fillStyle = grad;
+    ctx.beginPath();
+    ctx.ellipse(cx, capCY, capW, capH, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = '#7a1818';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+
+    // Glossy highlight stripe on top-left of cap.
+    ctx.fillStyle = 'rgba(255, 220, 220, 0.55)';
+    ctx.beginPath();
+    ctx.ellipse(cx - capW * 0.4, capCY - capH * 0.45, capW * 0.32, capH * 0.35, -0.45, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Classic white fly-agaric spots (deterministic positions per instance).
     ctx.fillStyle = '#fff';
-    ctx.beginPath(); ctx.arc(this.x + 22, this.y + 12 + yo, 4, 0, Math.PI * 2); ctx.fill();
-    ctx.beginPath(); ctx.arc(this.x + 42, this.y + 14 + yo, 3, 0, Math.PI * 2); ctx.fill();
+    const spots = [
+      [-0.62, 0.05, 3.2],
+      [-0.22, -0.55, 4.0],
+      [ 0.04,  0.30, 3.0],
+      [ 0.36, -0.28, 3.8],
+      [ 0.66,  0.10, 3.2]
+    ];
+    for (const [fx, fy, sr] of spots) {
+      ctx.beginPath();
+      ctx.arc(cx + fx * capW, capCY + fy * capH, sr, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = 'rgba(0, 0, 0, 0.08)';
+      ctx.lineWidth = 0.6;
+      ctx.stroke();
+    }
+
+    // ----- Friendly face on the stem -----
+    const eyeY = stemTop + 14;
+    // Whites
+    ctx.fillStyle = '#fff';
+    ctx.beginPath(); ctx.arc(cx - 6, eyeY, 3.5, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(cx + 6, eyeY, 3.5, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = '#888';
+    ctx.lineWidth = 0.7;
+    ctx.beginPath(); ctx.arc(cx - 6, eyeY, 3.5, 0, Math.PI * 2); ctx.stroke();
+    ctx.beginPath(); ctx.arc(cx + 6, eyeY, 3.5, 0, Math.PI * 2); ctx.stroke();
+    // Pupils — squinted shut while bouncing (squee!), wide open when idle.
+    ctx.fillStyle = '#1a0a30';
+    if (bouncing > 0.05) {
+      ctx.lineWidth = 1.4;
+      ctx.strokeStyle = '#1a0a30';
+      ctx.lineCap = 'round';
+      ctx.beginPath();
+      ctx.arc(cx - 6, eyeY, 2.5, Math.PI * 0.15, Math.PI * 0.85);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.arc(cx + 6, eyeY, 2.5, Math.PI * 0.15, Math.PI * 0.85);
+      ctx.stroke();
+    } else {
+      ctx.beginPath(); ctx.arc(cx - 6, eyeY + 0.5, 1.7, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.arc(cx + 6, eyeY + 0.5, 1.7, 0, Math.PI * 2); ctx.fill();
+      // Eye sparkles
+      ctx.fillStyle = '#fff';
+      ctx.beginPath(); ctx.arc(cx - 5.3, eyeY, 0.6, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.arc(cx + 6.7, eyeY, 0.6, 0, Math.PI * 2); ctx.fill();
+    }
+
+    // Cheek blush
+    ctx.fillStyle = 'rgba(255, 130, 165, 0.55)';
+    ctx.beginPath(); ctx.arc(cx - 12, eyeY + 3, 2.2, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(cx + 12, eyeY + 3, 2.2, 0, Math.PI * 2); ctx.fill();
+
+    // Mouth (bigger smile when bouncing)
+    ctx.strokeStyle = '#1a0a30';
+    ctx.lineWidth = 1.4;
+    ctx.lineCap = 'round';
+    ctx.beginPath();
+    if (bouncing > 0.05) {
+      ctx.fillStyle = '#3a1a4a';
+      ctx.beginPath();
+      ctx.ellipse(cx, eyeY + 7, 3.2, 2.2, 0, 0, Math.PI);
+      ctx.fill();
+      ctx.fillStyle = '#ff6b94';
+      ctx.beginPath();
+      ctx.ellipse(cx, eyeY + 8, 1.6, 1, 0, 0, Math.PI);
+      ctx.fill();
+    } else {
+      ctx.beginPath();
+      ctx.arc(cx, eyeY + 6, 2, 0.2, Math.PI - 0.2);
+      ctx.stroke();
+    }
+
+    // ----- Bounce sparkles (yellow stars puff outward) -----
+    if (bouncing > 0.05) {
+      const a = Math.min(1, bouncing * 4);
+      ctx.fillStyle = `rgba(255, 240, 140, ${a * 0.9})`;
+      const ringT = 1 - bouncing * 4;
+      const ringR = 14 + ringT * 22;
+      for (let i = 0; i < 5; i++) {
+        const ang = i * (Math.PI * 2 / 5) + t * 4;
+        const sx = cx + Math.cos(ang) * ringR;
+        const sy = capCY + Math.sin(ang) * ringR * 0.6 - 2;
+        ctx.beginPath();
+        ctx.arc(sx, sy, 2.2, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
   }
 }
 
